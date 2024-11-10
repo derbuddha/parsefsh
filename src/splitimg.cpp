@@ -17,11 +17,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <errno.h>
 #include <time.h>
 #include <string.h>
 #include <sys/types.h>
-#include <sys/mman.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 
@@ -34,7 +32,7 @@
 //#define DEBUG
 
 
-int write_subfile(const void *fbase, const adm_fat_t *af, const char *dir, unsigned blocksize)
+int write_subfile(const char *fbase, const adm_fat_t *af, const char *dir, unsigned blocksize)
 {
    char name[strlen(dir) + 14];
    int i, outfd,     // output file descriptor
@@ -74,7 +72,7 @@ int write_subfile(const void *fbase, const adm_fat_t *af, const char *dir, unsig
       // if block list of FAT was full increment to next FAT
       if (i >= MAX_FAT_BLOCKLIST)
       {
-         af = (void*) af + FAT_SIZE;
+         af = (adm_fat_t*)((char*) af + FAT_SIZE);
          // check if next FAT belongs to same file
          if (af->next_fat)
             continue;
@@ -109,8 +107,8 @@ int main(int argc, char **argv)
    struct tm tm;
    int fd = 0;
    int blocksize;
-   void *fbase;
-   char *path = ".";
+   char *fbase;
+   char *path = (char*) ".";
    int fat_cnt;
    int c;
 
@@ -130,10 +128,11 @@ int main(int argc, char **argv)
    if (fstat(fd, &st) == -1)
       perror("stat()"), exit(1);
 
-   if ((fbase = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0)) == MAP_FAILED)
-      perror("mmap()"), exit(1);
+   fbase = static_cast<char*>(malloc(sizeof(char)*st.st_size));
+   //if ((fbase = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0)) == MAP_FAILED)
+   //   perror("mmap()"), exit(1);
 
-   ah = fbase;
+   ah = (adm_header_t*)fbase;
    memset(&tm, 0, sizeof(tm));
    tm.tm_year = ah->creat_year - 1900;
    tm.tm_mon = ah->creat_month;
@@ -153,7 +152,7 @@ int main(int argc, char **argv)
          blocksize, (int) sizeof(ah->map_desc), ah->map_desc,
          ah->ver_major, ah->ver_minor, ah->fat_phys_block);
 
-   af = fbase + ah->fat_phys_block * 0x200 + 0x200;
+   af = (adm_fat_t*)(fbase + ah->fat_phys_block * 0x200 + 0x200);
    for (; af->subfile; )
    {
       if (!af->next_fat)
@@ -165,14 +164,15 @@ int main(int argc, char **argv)
          if ((fat_cnt = write_subfile(fbase, af, path, blocksize)) == -1)
             perror("write_subfile()"), exit(1);
 
-         af = (void*) af + fat_cnt * FAT_SIZE;
+         af = (adm_fat_t*)((char*) af + fat_cnt * FAT_SIZE);
       }
       else
          vlog("BUG!\n");
    }
 
-   if (munmap(fbase, st.st_size) == -1)
-      perror("munmap()"), exit(1);
+   free(fbase);
+   //if (munmap(fbase, st.st_size) == -1)
+   //   perror("munmap()"), exit(1);
 
    return 0;
 }
