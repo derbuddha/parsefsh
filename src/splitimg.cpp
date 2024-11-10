@@ -16,6 +16,7 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
+#include <string>
 #include <unistd.h>
 #include <time.h>
 #include <string.h>
@@ -72,7 +73,7 @@ int write_subfile(const char *fbase, const adm_fat_t *af, const char *dir, unsig
       // if block list of FAT was full increment to next FAT
       if (i >= MAX_FAT_BLOCKLIST)
       {
-         af = (adm_fat_t*)((char*) af + FAT_SIZE);
+         af = reinterpret_cast<adm_fat_t*>((char*) af + FAT_SIZE);
          // check if next FAT belongs to same file
          if (af->next_fat)
             continue;
@@ -91,7 +92,7 @@ int write_subfile(const char *fbase, const adm_fat_t *af, const char *dir, unsig
 
 void usage(const char *arg0)
 {
-   printf("Garmin IMG/ADM Splitter, (c) 2013 by Bernhard R. Fischer, <bf@abenteuerland.at>\n"
+   printf("Garmin IMG/ADM Splitter, Github\n"
           "usage: %s [OPTIONS]\n"
           "   -d <dir> ..... Directory to extract files to.\n",
           arg0);
@@ -111,6 +112,7 @@ int main(int argc, char **argv)
    char *path = (char*) ".";
    int fat_cnt;
    int c;
+   std::string myfile = "data/USERDATA.ADM";
 
    while ((c = getopt(argc, argv, "d:h")) != -1)
       switch (c)
@@ -124,6 +126,7 @@ int main(int argc, char **argv)
             return 0;
      }
 
+   fd = open(myfile.c_str(), O_RDONLY);
 
    if (fstat(fd, &st) == -1)
       perror("stat()"), exit(1);
@@ -132,7 +135,9 @@ int main(int argc, char **argv)
    //if ((fbase = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0)) == MAP_FAILED)
    //   perror("mmap()"), exit(1);
 
-   ah = (adm_header_t*)fbase;
+   read(fd, fbase, st.st_size);  // read in the file
+
+   ah = reinterpret_cast<adm_header_t*>(fbase);
    memset(&tm, 0, sizeof(tm));
    tm.tm_year = ah->creat_year - 1900;
    tm.tm_mon = ah->creat_month;
@@ -152,7 +157,7 @@ int main(int argc, char **argv)
          blocksize, (int) sizeof(ah->map_desc), ah->map_desc,
          ah->ver_major, ah->ver_minor, ah->fat_phys_block);
 
-   af = (adm_fat_t*)(fbase + ah->fat_phys_block * 0x200 + 0x200);
+   af = reinterpret_cast<adm_fat_t*>(fbase + ah->fat_phys_block * 0x200 + 0x200);
    for (; af->subfile; )
    {
       if (!af->next_fat)
@@ -164,7 +169,7 @@ int main(int argc, char **argv)
          if ((fat_cnt = write_subfile(fbase, af, path, blocksize)) == -1)
             perror("write_subfile()"), exit(1);
 
-         af = (adm_fat_t*)((char*) af + fat_cnt * FAT_SIZE);
+         af = reinterpret_cast<adm_fat_t*>((char*) af + fat_cnt * FAT_SIZE);
       }
       else
          vlog("BUG!\n");

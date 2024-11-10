@@ -16,14 +16,14 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
+#include <string>
 #include <unistd.h>
-#include <errno.h>
 #include <time.h>
 #include <string.h>
 #include <sys/types.h>
-#include <sys/mman.h>
 #include <sys/stat.h>
 #include <math.h>
+#include <fcntl.h>
 
 #include "admfunc.h"
 
@@ -187,9 +187,10 @@ int main(int argc, char **argv)
 {
    struct stat st;
    int fd = 0;
-   void *fbase;
+   char *fbase;
    int format = FMT_OSM;
    int c;
+    std::string myfile = "USERDATA.TRK";
 
    while ((c = getopt(argc, argv, "f:h")) != -1)
       switch (c)
@@ -210,25 +211,27 @@ int main(int argc, char **argv)
             return 0;
      }
 
+   fd = open(myfile.c_str(), O_RDONLY);
 
    if (fstat(fd, &st) == -1)
       perror("stat()"), exit(1);
 
-   if ((fbase = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0)) == MAP_FAILED)
-      perror("mmap()"), exit(1);
+   fbase = static_cast<char*>(malloc(sizeof(char)*st.st_size));
+   //if ((fbase = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0)) == MAP_FAILED)
+   //   perror("mmap()"), exit(1);
 
+   read(fd, fbase, st.st_size);  // read in the file
    
    if (format == FMT_OSM)
       printf("<?xml version='1.0' encoding='UTF-8'?>\n<osm version='0.6' generator='parseadm'>\n");
 
-   parse_adm(fbase, format);
+   parse_adm(reinterpret_cast<adm_trk_header_t*>(fbase), format);
 
    if (format == FMT_OSM)
       printf("</osm>\n");
 
 
-   if (munmap(fbase, st.st_size) == -1)
-      perror("munmap()"), exit(1);
+   free(fbase);
 
    return 0;
 }

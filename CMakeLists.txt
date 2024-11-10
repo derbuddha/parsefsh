@@ -2,24 +2,35 @@ cmake_minimum_required(VERSION 3.16)
 
 project(parsefshTest LANGUAGES CXX)
 
-set(CMAKE_AUTOUIC ON)
-set(CMAKE_AUTOMOC ON)
-set(CMAKE_AUTORCC ON)
-
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core)
-find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core)
+set(FILE_PATH "data/USERDATA.ADM")
 
-add_executable(parsefshTest
+add_executable(parsefsh
   src/splitimg.cpp
   src/admfunc.h
 )
-target_link_libraries(parsefshTest Qt${QT_VERSION_MAJOR}::Core)
+
+add_executable(parsetrk
+  src/parsetrk.cpp
+  src/admfunc.h
+)
 
 include(GNUInstallDirs)
-install(TARGETS parsefshTest
+install(TARGETS parsefsh
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
+
+add_custom_command(
+    OUTPUT
+        ${CMAKE_CURRENT_BINARY_DIR}/${FILE_PATH}
+    DEPENDS
+        ${CMAKE_CURRENT_SOURCE_DIR}/${FILE_PATH}
+    COMMAND
+        ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/${FILE_PATH}
+        ${CMAKE_CURRENT_BINARY_DIR}/${FILE_PATH}
+)
+add_custom_target(copy DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${FILE_PATH})
